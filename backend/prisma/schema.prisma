@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model BillyardTable {
+  id           Int                        @id @unique @default(autoincrement())
+  light_status LightStatus                @default(OFF)
+  name         String                     @unique
+  status       BillyardTableStatus        @default(KOSONG)
+  esp_pin      String?
+  start_time   DateTime?
+  end_time     DateTime?
+  crated_at    DateTime                   @default(now())
+  updated_at   DateTime                   @updatedAt
+  Reservation  BillyardTableReservation[]
+  pricePerHour Float?                     @default(0)
+
+  @@map("billyards_tables")
+}
+
+model User {
+  id          Int                        @id @unique @default(autoincrement())
+  username    String                     @unique
+  password    String
+  email       String                     @unique
+  role        Role                       @default(KASIR)
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+  Reservation BillyardTableReservation[]
+
+  @@map("users")
+}
+
+model MenuItems {
+  id              Int               @id @unique @default(autoincrement())
+  name            String            @unique
+  price           Float
+  available       Boolean           @default(true)
+  category        String
+  description     String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  ReservaionAddon ReservaionAddon[]
+
+  @@map("menu_items")
+}
+
+model BillyardTableReservation {
+  id              Int               @id @unique @default(autoincrement())
+  tableId         Int               @unique
+  userId          Int
+  startTime       DateTime          @default(now())
+  endTime         DateTime
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  totalPrice      Float?            @default(0)
+  table           BillyardTable     @relation(fields: [tableId], references: [id])
+  user            User?             @relation(fields: [userId], references: [id])
+  customer_name   String?
+  ReservaionAddon ReservaionAddon[]
+
+  @@map("billyard_table_reservations")
+}
+
+model ReservaionAddon {
+  id            Int      @id @unique @default(autoincrement())
+  reservationId Int
+  itemId        Int
+  quantity      Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  reservation BillyardTableReservation @relation(fields: [reservationId], references: [id])
+  item        MenuItems                @relation(fields: [itemId], references: [id])
+
+  @@map("reservation_addons")
+}
+
+enum Role {
+  MANAGER
+  KASIR
+}
+
+enum BillyardTableStatus {
+  KOSONG
+  BERMAIN
+  SELESAI
+}
+
+enum LightStatus {
+  ON
+  OFF
+}
