@@ -7,7 +7,7 @@ export class EspController {
    * getLights
    */
   public async getLightStatus() {
-    const lights = await this.prisma.billyardTable.findMany();
+    const lights = await this.prisma.billiardTable.findMany();
     return lights;
   }
 }

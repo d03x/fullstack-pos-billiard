@@ -8,20 +8,20 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model BillyardTable {
+model BilliardTable {
   id           Int                        @id @unique @default(autoincrement())
   light_status LightStatus                @default(OFF)
   name         String                     @unique
-  status       BillyardTableStatus        @default(KOSONG)
+  status       BilliardTableStatus        @default(KOSONG)
   esp_pin      String?
   start_time   DateTime?
   end_time     DateTime?
   crated_at    DateTime                   @default(now())
   updated_at   DateTime                   @updatedAt
-  Reservation  BillyardTableReservation[]
+  Reservation  BilliardTableReservation[]
   pricePerHour Float?                     @default(0)
 
-  @@map("billyards_tables")
+  @@map("billiards_tables")
 }
 
 model User {
@@ -32,7 +32,7 @@ model User {
   role        Role                       @default(KASIR)
   createdAt   DateTime                   @default(now())
   updatedAt   DateTime                   @updatedAt
-  Reservation BillyardTableReservation[]
+  Reservation BilliardTableReservation[]
 
   @@map("users")
 }
@@ -51,7 +51,7 @@ model MenuItems {
   @@map("menu_items")
 }
 
-model BillyardTableReservation {
+model BilliardTableReservation {
   id              Int               @id @unique @default(autoincrement())
   tableId         Int               @unique
   userId          Int
@@ -60,12 +60,12 @@ model BillyardTableReservation {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   totalPrice      Float?            @default(0)
-  table           BillyardTable     @relation(fields: [tableId], references: [id])
+  table           BilliardTable     @relation(fields: [tableId], references: [id])
   user            User?             @relation(fields: [userId], references: [id])
   customer_name   String?
   ReservaionAddon ReservaionAddon[]
 
-  @@map("billyard_table_reservations")
+  @@map("billiard_table_reservations")
 }
 
 model ReservaionAddon {
@@ -76,7 +76,7 @@ model ReservaionAddon {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
-  reservation BillyardTableReservation @relation(fields: [reservationId], references: [id])
+  reservation BilliardTableReservation @relation(fields: [reservationId], references: [id])
   item        MenuItems                @relation(fields: [itemId], references: [id])
 
   @@map("reservation_addons")
@@ -87,7 +87,7 @@ enum Role {
   KASIR
 }
 
-enum BillyardTableStatus {
+enum BilliardTableStatus {
   KOSONG
   BERMAIN
   SELESAI

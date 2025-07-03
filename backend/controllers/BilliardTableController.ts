@@ -1,16 +1,16 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type {
-  BillyardTableStatus,
+  BilliardTableStatus,
   LightStatus,
   PrismaClient,
 } from "../generated/prisma/client";
 
-export class BilyardTableController {
+export class BilliardTableController {
   constructor(private prisma: PrismaClient) {}
 
   public async getTables() {
     try {
-      const tables = await this.prisma.billyardTable.findMany();
+      const tables = await this.prisma.billiardTable.findMany();
       return tables;
     } catch (error) {
       console.error("Error fetching tables:", error);
@@ -21,7 +21,7 @@ export class BilyardTableController {
   public async getTableById(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: number };
     try {
-      const table = await this.prisma.billyardTable.findUnique({
+      const table = await this.prisma.billiardTable.findUnique({
         where: { id: Number(id) },
       });
       if (!table) {
@@ -37,7 +37,7 @@ export class BilyardTableController {
   public async destroyTable(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: number };
     try {
-      const table = await this.prisma.billyardTable.delete({
+      const table = await this.prisma.billiardTable.delete({
         where: { id: Number(id) },
       });
       reply.status(200).send(table);
@@ -51,7 +51,7 @@ export class BilyardTableController {
     const { id } = request.params as { id: number };
     const { name, status, light_status, esp_pin, start_time, end_time } = request.body as {
       name: string;
-      status: BillyardTableStatus;
+      status: BilliardTableStatus;
       light_status: LightStatus;
       esp_pin?: string;
       start_time?: Date;
@@ -59,7 +59,7 @@ export class BilyardTableController {
     };
 
     try {
-      const table = await this.prisma.billyardTable.update({
+      const table = await this.prisma.billiardTable.update({
         where: { id: Number(id) },
         data: { name, status, light_status, esp_pin, start_time, end_time },
       });
@@ -72,9 +72,9 @@ export class BilyardTableController {
 
   public async updateTableStatus(request: FastifyRequest, reply: FastifyReply) {
     const { id } = request.params as { id: number };
-    const { status } = request.body as { status: BillyardTableStatus };
+    const { status } = request.body as { status: BilliardTableStatus };
     try {
-      const table = await this.prisma.billyardTable.update({
+      const table = await this.prisma.billiardTable.update({
         where: { id: Number(id) },
         data: { status },
       });
@@ -89,7 +89,7 @@ export class BilyardTableController {
     const { id } = request.params as { id: number };
     const { light_status } = request.body as { light_status: LightStatus };
     try {
-      const table = await this.prisma.billyardTable.update({
+      const table = await this.prisma.billiardTable.update({
         where: { id: Number(id) },
         data: { light_status },
       });
@@ -103,14 +103,14 @@ export class BilyardTableController {
   public async addNewTable(request: FastifyRequest, reply: FastifyReply) {
     const { name, status, light_status, esp_pin, start_time, end_time } = request.body as {
       name: string;
-      status?: BillyardTableStatus;
+      status?: BilliardTableStatus;
       light_status?: LightStatus;
       esp_pin?: string;
       start_time?: Date;
       end_time?: Date;
     };
     try {
-      const newTable = await this.prisma.billyardTable.create({
+      const newTable = await this.prisma.billiardTable.create({
         data: {
           name,
           status: status ?? "KOSONG",

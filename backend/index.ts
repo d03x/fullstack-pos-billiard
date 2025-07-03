@@ -1,7 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { ESPRoute } from "./routes/ESPRoute";
 import { PrismaClient } from "./generated/prisma/client";
-import { BilyardTableRoute } from "./routes/BilyardTableRoute";
+import { BilliardTableRoute } from "./routes/BilliardTableRoute";
 import fastifyCors from "@fastify/cors";
 const app = Fastify({ logger: false });
 const prisma = new PrismaClient()
@@ -16,7 +16,7 @@ app.register(fastifyCors,{
   credentials: true, // Allow credentials (cookies, authorization headers, etc.)
 })
 app.register(ESPRoute);
-app.register(BilyardTableRoute);
+app.register(BilliardTableRoute);
 try {
   await app.listen({ port: 5500,host:"0.0.0.0" }, (errr, address) => {
     if (errr) {

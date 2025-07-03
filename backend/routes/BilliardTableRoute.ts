@@ -1,10 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { EspController } from "../controllers/EspController";
-import { BilyardTableController } from "../controllers/BilyardTableController";
+import { BilliardTableController } from "../controllers/BilliardTableController";
 
-export const BilyardTableRoute = async (app: FastifyInstance) => {
+export const BilliardTableRoute = async (app: FastifyInstance) => {
   const prisma = app.prisma; // Access the Prisma client from the Fastify instance
-  const TableController: BilyardTableController = new BilyardTableController(
+  const TableController: BilliardTableController = new BilliardTableController(
     prisma
   );
   app.patch(
