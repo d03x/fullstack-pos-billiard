@@ -1,13 +1,18 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { ESPRoute } from "./routes/ESPRoute";
 import { PrismaClient } from "./generated/prisma/client";
-import { BilliardTableRoute } from "./routes/BilliardTableRoute";
+import { PoolRoutes } from "./routes/PoolRoutes";
 import fastifyCors from "@fastify/cors";
-const app = Fastify({ logger: false });
+import { OrderRoute } from "./routes/OrderRoute";
+import { setupBookingCronJobs } from "./cron/poolBookingCron";
+const app = Fastify({ logger: true });
 const prisma = new PrismaClient()
 app.decorate("prisma",prisma);
 app.addHook("onClose",async (instance:FastifyInstance)=>{
     await instance.prisma.$disconnect();
+})
+app.addHook("onReady",async ()=>{
+  await setupBookingCronJobs(app)
 })
 app.register(fastifyCors,{
   origin: "*", // Allow all origins
@@ -16,7 +21,8 @@ app.register(fastifyCors,{
   credentials: true, // Allow credentials (cookies, authorization headers, etc.)
 })
 app.register(ESPRoute);
-app.register(BilliardTableRoute);
+app.register(PoolRoutes);
+app.register(OrderRoute);
 try {
   await app.listen({ port: 5500,host:"0.0.0.0" }, (errr, address) => {
     if (errr) {

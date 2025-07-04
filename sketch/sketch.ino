@@ -6,7 +6,7 @@
 //SETUP SSID CONFIG
 const char* ssid = "esp";
 const char* password = "123456789";
-const char* backend_url = "192.168.135.92";
+const char* backend_url = "192.168.56.92";
 const int port = 5500;
 const char* light_endpoint = "/esp/light/status";
 const int lampuPins[3] = { D0, D1, D2 };
@@ -101,7 +101,7 @@ void loop() {
               const char* lightId = item["id"];
               const char* status = item["status"];
               const char* light_status = item["light_status"];
-              const char* pin = item["esp_pin"];
+              const char* pin = item["light_pin"];
               int pinNumber = parsePinName(pin);
               safePinMode(pinNumber, OUTPUT);
               if (strcmp(light_status, "ON") == 0) {

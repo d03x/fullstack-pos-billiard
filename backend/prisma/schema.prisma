@@ -8,92 +8,50 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model BilliardTable {
-  id           Int                        @id @unique @default(autoincrement())
-  light_status LightStatus                @default(OFF)
-  name         String                     @unique
-  status       BilliardTableStatus        @default(KOSONG)
-  esp_pin      String?
-  start_time   DateTime?
-  end_time     DateTime?
-  crated_at    DateTime                   @default(now())
-  updated_at   DateTime                   @updatedAt
-  Reservation  BilliardTableReservation[]
-  pricePerHour Float?                     @default(0)
-
-  @@map("billiards_tables")
+enum PoolTableStatus {
+  Available
+  Occupied
+  Maintenance
 }
 
-model User {
-  id          Int                        @id @unique @default(autoincrement())
-  username    String                     @unique
-  password    String
-  email       String                     @unique
-  role        Role                       @default(KASIR)
-  createdAt   DateTime                   @default(now())
-  updatedAt   DateTime                   @updatedAt
-  Reservation BilliardTableReservation[]
-
-  @@map("users")
-}
-
-model MenuItems {
-  id              Int               @id @unique @default(autoincrement())
-  name            String            @unique
-  price           Float
-  available       Boolean           @default(true)
-  category        String
-  description     String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  ReservaionAddon ReservaionAddon[]
-
-  @@map("menu_items")
-}
-
-model BilliardTableReservation {
-  id              Int               @id @unique @default(autoincrement())
-  tableId         Int               @unique
-  userId          Int
-  startTime       DateTime          @default(now())
-  endTime         DateTime
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  totalPrice      Float?            @default(0)
-  table           BilliardTable     @relation(fields: [tableId], references: [id])
-  user            User?             @relation(fields: [userId], references: [id])
-  customer_name   String?
-  ReservaionAddon ReservaionAddon[]
-
-  @@map("billiard_table_reservations")
-}
-
-model ReservaionAddon {
-  id            Int      @id @unique @default(autoincrement())
-  reservationId Int
-  itemId        Int
-  quantity      Int      @default(1)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  reservation BilliardTableReservation @relation(fields: [reservationId], references: [id])
-  item        MenuItems                @relation(fields: [itemId], references: [id])
-
-  @@map("reservation_addons")
-}
-
-enum Role {
-  MANAGER
-  KASIR
-}
-
-enum BilliardTableStatus {
-  KOSONG
-  BERMAIN
-  SELESAI
-}
-
-enum LightStatus {
+enum PoolTableLightStatus {
   ON
   OFF
+}
+
+model PoolTables {
+  id           Int                  @id @default(autoincrement())
+  name         String
+  light_pin    String
+  light_status PoolTableLightStatus @default(OFF)
+  hourly_rate  Decimal              @default(0)
+  status       PoolTableStatus      @default(Available)
+  PoolBookings PoolBookings[]
+
+  @@map("pool_tables")
+}
+
+enum BookingStatus {
+  Reserved
+  InProgress
+  Completed
+  Cancelled
+}
+
+model PoolBookings {
+  id            Int           @id @default(autoincrement())
+  customer_name String?
+  tableId       Int
+  poolTable     PoolTables    @relation(fields: [tableId], references: [id])
+  startTime     DateTime
+  endTime       DateTime?
+  durationHours Float?
+  hourlyRate    Float
+  totalPrice    Float?
+  status        BookingStatus @default(Reserved)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("pool_bookings")
 }
