@@ -41,6 +41,14 @@ export class PoolController {
       return error;
     }
   }
+  public async getAllBookingHistory(request:FastifyRequest,reply:FastifyReply){
+    const data =await this.prisma.poolBookings.findMany({
+      include : {
+        poolTable:true
+      }
+    });
+    return data;
+  }
   public async endBookingSession(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { bookingId } = request.body as { bookingId: number };
