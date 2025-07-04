@@ -84,42 +84,56 @@ export class PoolController {
         bookingId: number;
         hours: number;
       };
-      console.log("Extending booking:", bookingId, hours);
 
-      if (!bookingId || !hours) {
+      if (!bookingId || hours === undefined) {
         return reply.status(400).send({
-          error: "Missing required fields: bookingId, additionalHours",
+          error: "Missing required fields: bookingId or hours",
         });
       }
 
-      const booking = await this.prisma.poolBookings.findUnique({
+      // 1. Dapatkan booking dengan lock untuk prevent race condition
+      const booking: any = await this.prisma.poolBookings.findUnique({
         where: { id: bookingId },
-      }) as any;
-
-      if (!booking) {
-        return reply.status(404).send({ error: "Booking not found" });
-      }
-
-      const newEndTime = dayjs(booking.endTime)
-        .add(hours, "hour")
-        .toISOString();
-      
-      const updatedBooking = await this.prisma.poolBookings.update({
-        where: { id: bookingId },
-        data: {
-          endTime: newEndTime,
-          durationHours: booking.durationHours + hours,
-          totalPrice: booking.totalPrice + booking.hourlyRate * hours,
-        },
       });
+
+      // 2. Hitung waktu baru dengan presisi
+      const currentEndTime = new Date(booking.endTime);
+      const newEndTime = new Date(
+        currentEndTime.getTime() + hours * 60 * 60 * 1000
+      );
+
+      // 3. Update dengan transaction
+      const [updatedBooking] = await this.prisma.$transaction([
+        this.prisma.poolBookings.update({
+          where: { id: bookingId },
+          data: {
+            endTime: newEndTime,
+            durationHours: booking.durationHours + hours,
+            totalPrice: booking.totalPrice + booking.hourlyRate * hours,
+          },
+        }),
+        // Jika perlu update table status juga
+        this.prisma.poolTables.update({
+          where: { id: booking.tableId },
+          data: { status: "Occupied" },
+        }),
+      ]);
 
       return reply.status(200).send({
         message: "Booking extended successfully",
-        booking: updatedBooking,
+        booking: {
+          ...updatedBooking,
+          // Format untuk keperluan display
+          endTime: newEndTime.toISOString(),
+          durationHours: booking.durationHours + hours,
+        },
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error extending booking:", error);
-      return reply.status(500).send({ error: "Internal server error" });
+      return reply.status(500).send({
+        error: "Failed to extend booking",
+        details: error.message,
+      });
     }
   }
   public async createBooking(request: FastifyRequest, reply: FastifyReply) {
@@ -127,106 +141,116 @@ export class PoolController {
       const { customer_name, tableId, startTime, durationHours, notes } =
         request.body as CreateBookingRequest;
 
-      // Validate required fields
+      // Validasi input
       if (!customer_name || !tableId || !startTime || !durationHours) {
         return reply.status(400).send({
-          error:
-            "Missing required fields: customer_name, tableId, startTime, durationHours",
+          error: "Missing required fields",
+          details: {
+            customer_name: !customer_name,
+            tableId: !tableId,
+            startTime: !startTime,
+            durationHours: !durationHours,
+          },
         });
       }
 
-      // Check if table exists and is available
-      const poolTable = await this.prisma.poolTables.findUnique({
-        where: { id: tableId },
-      });
+      // 1. Parse waktu dengan presisi
+      const startDate = new Date(startTime);
+      const endDate = new Date(
+        startDate.getTime() + durationHours * 60 * 60 * 1000
+      );
 
-      if (!poolTable) {
+      // 2. Validasi waktu
+      if (isNaN(startDate.getTime())) {
+        return reply.status(400).send({
+          error: "Invalid start time format",
+          received: startTime,
+        });
+      }
+
+      // 3. Cek ketersediaan meja (dengan transaction)
+      const [table, overlappingBookings] = await this.prisma.$transaction([
+        this.prisma.poolTables.findUnique({
+          where: { id: tableId },
+        }),
+        this.prisma.poolBookings.findMany({
+          where: {
+            tableId,
+            status: { in: ["Reserved", "InProgress"] },
+            OR: [
+              { startTime: { lt: endDate }, endTime: { gt: startDate } },
+              { startTime: { gte: startDate }, endTime: { lte: endDate } },
+            ],
+          },
+        }),
+      ]);
+
+      if (!table) {
         return reply.status(404).send({ error: "Table not found" });
       }
 
-      if (poolTable.status !== "Available") {
-        return reply
-          .status(400)
-          .send({ error: "Table is not available for booking" });
+      if (table.status !== "Available") {
+        return reply.status(409).send({
+          error: "Table not available",
+          currentStatus: table.status,
+        });
       }
-
-      // Parse and validate times
-      const startDateTime = dayjs(startTime);
-      const endDateTime = startDateTime.add(durationHours, "hour");
-
-      if (!startDateTime.isValid()) {
-        return reply.status(400).send({ error: "Invalid start time format" });
-      }
-
-      // Check for overlapping bookings
-      const overlappingBookings = await this.prisma.poolBookings.findMany({
-        where: {
-          tableId,
-          OR: [
-            {
-              startTime: { lt: endDateTime.toISOString() },
-              endTime: { gt: startDateTime.toISOString() },
-            },
-            {
-              startTime: { gte: startDateTime.toISOString() },
-              endTime: { lte: endDateTime.toISOString() },
-            },
-          ],
-          status: { in: ["Reserved", "InProgress"] },
-        },
-      });
 
       if (overlappingBookings.length > 0) {
         return reply.status(409).send({
-          error: "Table already booked for the selected time period",
-          conflictingBookings: overlappingBookings.map((b) => ({
+          error: "Time slot already booked",
+          conflicts: overlappingBookings.map((b) => ({
             id: b.id,
-            startTime: b.startTime,
-            endTime: b.endTime,
+            start: b.startTime,
+            end: b.endTime,
             status: b.status,
           })),
         });
       }
 
-      // Calculate pricing
-      const hourlyRate = Number(poolTable.hourly_rate);
+      // 4. Hitung harga
+      const hourlyRate = Number(table.hourly_rate);
       const totalPrice = hourlyRate * durationHours;
 
-      // Create the booking
-      const booking = await this.prisma.poolBookings.create({
-        data: {
-          customer_name,
-          poolTable: { connect: { id: Number(tableId) } },
-          startTime: startDateTime.toISOString(),
-          endTime: endDateTime.toISOString(),
-          durationHours,
-          hourlyRate,
-          totalPrice,
-          status: "Reserved",
-          notes,
-        },
-        include: {
-          poolTable: true,
-        },
-      });
-
-      // Update table status if needed (optional)
-      await this.prisma.poolTables.update({
-        where: { id: tableId },
-        data: { status: "Occupied" },
-      });
+      // 5. Buat booking (dalam transaction)
+      const [booking] = await this.prisma.$transaction([
+        this.prisma.poolBookings.create({
+          data: {
+            customer_name,
+            tableId,
+            startTime: startDate,
+            endTime: endDate, // Gunakan endDate yang sudah dihitung
+            durationHours,
+            hourlyRate,
+            totalPrice,
+            status: "Reserved",
+            notes,
+          },
+          include: { poolTable: true },
+        }),
+        this.prisma.poolTables.update({
+          where: { id: tableId },
+          data: { status: "Occupied" },
+        }),
+      ]);
 
       return reply.status(201).send({
         message: "Booking created successfully",
         booking: {
           ...booking,
-          totalPrice: formatRupiah(booking.totalPrice || 0),
-          hourlyRate: formatRupiah(booking.hourlyRate),
+          totalPrice: formatRupiah(totalPrice),
+          hourlyRate: formatRupiah(hourlyRate),
+          // Format waktu untuk display
+          startTime: startDate.toISOString(),
+          endTime: endDate.toISOString(),
         },
       });
-    } catch (error) {
-      console.error("Error creating booking:", error);
-      return reply.status(500).send({ error: "Internal server error" });
+    } catch (error: any) {
+      console.error("[CREATE BOOKING ERROR]", error);
+      return reply.status(500).send({
+        error: "Internal server error",
+        details: error.message,
+      });
     }
   }
 }
