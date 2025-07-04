@@ -41,18 +41,12 @@ export class PoolController {
       return error;
     }
   }
-  public async extendHourBooking(request:FastifyRequest, reply: FastifyReply) {
+  public async endBookingSession(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const { bookingId, hours } = request.body as {
-        bookingId: number;
-        hours: number;
-      };
-      console.log("Extending booking:", bookingId, hours);
-      
-      if (!bookingId || !hours) {
-        return reply.status(400).send({
-          error: "Missing required fields: bookingId, additionalHours",
-        });
+      const { bookingId } = request.body as { bookingId: number };
+
+      if (!bookingId) {
+        return reply.status(400).send({ error: "Booking ID is required" });
       }
 
       const booking = await this.prisma.poolBookings.findUnique({
@@ -63,19 +57,59 @@ export class PoolController {
         return reply.status(404).send({ error: "Booking not found" });
       }
 
-     
+      // Update booking status to Completed
+      const updatedBooking = await this.prisma.poolBookings.update({
+        where: { id: bookingId },
+        data: { status: "Completed" },
+      });
+
+      // Update table status to Available
+      await this.prisma.poolTables.update({
+        where: { id: booking.tableId },
+        data: { status: "Available" },
+      });
+
+      return reply.status(200).send({
+        message: "Booking ended successfully",
+        booking: updatedBooking,
+      });
+    } catch (error) {
+      console.error("Error ending booking session:", error);
+      return reply.status(500).send({ error: "Internal server error" });
+    }
+  }
+  public async extendHourBooking(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { bookingId, hours } = request.body as {
+        bookingId: number;
+        hours: number;
+      };
+      console.log("Extending booking:", bookingId, hours);
+
+      if (!bookingId || !hours) {
+        return reply.status(400).send({
+          error: "Missing required fields: bookingId, additionalHours",
+        });
+      }
+
+      const booking = await this.prisma.poolBookings.findUnique({
+        where: { id: bookingId },
+      }) as any;
+
+      if (!booking) {
+        return reply.status(404).send({ error: "Booking not found" });
+      }
 
       const newEndTime = dayjs(booking.endTime)
         .add(hours, "hour")
         .toISOString();
-
+      
       const updatedBooking = await this.prisma.poolBookings.update({
         where: { id: bookingId },
         data: {
           endTime: newEndTime,
           durationHours: booking.durationHours + hours,
-          totalPrice:
-            booking.totalPrice + booking.hourlyRate * hours,
+          totalPrice: booking.totalPrice + booking.hourlyRate * hours,
         },
       });
 
@@ -87,7 +121,6 @@ export class PoolController {
       console.error("Error extending booking:", error);
       return reply.status(500).send({ error: "Internal server error" });
     }
-
   }
   public async createBooking(request: FastifyRequest, reply: FastifyReply) {
     try {

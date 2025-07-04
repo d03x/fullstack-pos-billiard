@@ -8,4 +8,6 @@ export const PoolRoutes = async (app: FastifyInstance) => {
   app.get("/api/pool-tables", TableController.get.bind(TableController));
   app.put("/api/create-booking", TableController.createBooking.bind(TableController));
   app.put("/api/pool-tables/booking/extend-time",TableController.extendHourBooking.bind(TableController))
+    app.put("/api/pool-tables/booking/end-session",TableController.endBookingSession.bind(TableController))
+
 };
